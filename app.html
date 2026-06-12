@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Card Table</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <h1>Card Table</h1>
+    <div class="user-chip" id="userChip"></div>
+  </div>
+
+  <div class="panel">
+    <p class="eyebrow">New game</p>
+    <h2 style="margin-top:0;">Pick a game</h2>
+    <div class="game-grid">
+      <a class="game-card" href="game.html?type=tarneeb">
+        <div class="gname">Tarneeb</div>
+        <div class="grule">4 players, 2 teams. Ends at 31+. +/− scores.</div>
+      </a>
+      <a class="game-card" href="game.html?type=400">
+        <div class="gname">400</div>
+        <div class="grule">4 players, 2 teams. Ends at 41+. +/− scores.</div>
+      </a>
+      <a class="game-card" href="game.html?type=likha">
+        <div class="gname">Likha</div>
+        <div class="grule">4 players, 2 teams. Ends at 101+. Add only.</div>
+      </a>
+      <a class="game-card" href="game.html?type=tawle">
+        <div class="gname">Tawle</div>
+        <div class="grule">Single player tracking. Dice roller included.</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="panel">
+    <p class="eyebrow">Archive</p>
+    <h2 style="margin-top:0;">Game history</h2>
+    <div id="historyList"><div class="empty-state">Loading…</div></div>
+  </div>
+
+  <div class="panel" style="opacity:0.85;">
+    <p class="eyebrow">Settings</p>
+    <h2 style="margin-top:0;">GitHub token</h2>
+    <p style="font-size:0.85rem; opacity:0.8; margin:0 0 10px;">
+      Needed to save finished games back to <code>history.json</code> in the repo.
+      Create a fine-grained personal access token with read/write access to
+      this repo's contents, and paste it below. It is stored only in this
+      browser (localStorage), never committed.
+    </p>
+    <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+    <button class="secondary" style="margin-top:10px;" id="saveTokenBtn">Save token</button>
+    <span id="tokenStatus" style="margin-left:10px; font-size:0.8rem;"></span>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+const session = requireLogin();
+if (session) renderUserChip(session);
+
+// Token settings
+const tokenInput = document.getElementById("ghToken");
+tokenInput.value = getToken();
+document.getElementById("saveTokenBtn").addEventListener("click", () => {
+  setToken(tokenInput.value.trim());
+  document.getElementById("tokenStatus").textContent = "Saved.";
+  setTimeout(() => document.getElementById("tokenStatus").textContent = "", 2000);
+});
+
+// Load history
+async function loadHistory() {
+  const listEl = document.getElementById("historyList");
+  try {
+    let data;
+    try {
+      const res = await fetch("history.json", { cache: "no-store" });
+      if (!res.ok) throw new Error("local fetch failed");
+      data = await res.json();
+    } catch {
+      const { json } = await fetchJsonFile("history.json");
+      data = json;
+    }
+
+    const games = (data.games || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    if (games.length === 0) {
+      listEl.innerHTML = '<div class="empty-state">No games recorded yet. Play one and it’ll show up here.</div>';
+      return;
+    }
+
+    listEl.innerHTML = games.map(renderHistItem).join("");
+  } catch (e) {
+    listEl.innerHTML = `<div class="empty-state">Could not load history: ${e.message}</div>`;
+  }
+}
+
+function renderHistItem(g) {
+  const dateStr = new Date(g.date).toLocaleString(undefined, {
+    year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+  });
+  const typeLabel = { "400": "400", "tarneeb": "Tarneeb", "likha": "Likha", "tawle": "Tawle" }[g.type] || g.type;
+
+  let winnerStr;
+  if (g.type === "tawle") {
+    winnerStr = `🏆 ${g.winner}`;
+  } else {
+    const winners = g.winningTeam || [];
+    winnerStr = `🏆 ${winners.join(" & ")} — ${g.finalScore ?? ""}`;
+  }
+
+  return `
+    <div class="hist-item">
+      <div>
+        <div class="hgame">${typeLabel}</div>
+        <div class="hdate">${dateStr}</div>
+      </div>
+      <div class="hwinner">${winnerStr}</div>
+    </div>
+  `;
+}
+
+loadHistory();
+</script>
+</body>
+</html>

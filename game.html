@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Card Table — Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <h1 id="gameTitle">Game</h1>
+    <div class="user-chip" id="userChip"></div>
+  </div>
+
+  <!-- SETUP PANEL (4-player games) -->
+  <div class="panel" id="setupPanel">
+    <p class="eyebrow" id="setupEyebrow">Setup</p>
+    <h2 style="margin-top:0;">Who's playing?</h2>
+
+    <div class="team-label">Team A</div>
+    <div class="team-sub">Partners sit across from each other</div>
+    <label for="p1">Player 1</label>
+    <input type="text" id="p1" placeholder="Name">
+    <label for="p2">Player 2 (partner)</label>
+    <input type="text" id="p2" placeholder="Name">
+
+    <div class="team-label" style="margin-top:18px;">Team B</div>
+    <div class="team-sub">Partners sit across from each other</div>
+    <label for="p3">Player 1</label>
+    <input type="text" id="p3" placeholder="Name">
+    <label for="p4">Player 2 (partner)</label>
+    <input type="text" id="p4" placeholder="Name">
+
+    <div class="error" id="setupError"></div>
+    <button class="full" id="startBtn" style="margin-top:18px;">Start game</button>
+  </div>
+
+  <!-- SETUP PANEL (Tawle, single player) -->
+  <div class="panel" id="tawleSetupPanel" style="display:none;">
+    <p class="eyebrow">Setup</p>
+    <h2 style="margin-top:0;">Who's rolling?</h2>
+    <label for="tawlePlayer">Player name</label>
+    <input type="text" id="tawlePlayer" placeholder="Name">
+    <div class="error" id="tawleSetupError"></div>
+    <button class="full" id="tawleStartBtn" style="margin-top:18px;">Start</button>
+  </div>
+
+  <!-- SCORING PANEL (4-player games) -->
+  <div class="panel" id="scoringPanel" style="display:none;">
+    <p class="eyebrow" id="scoringEyebrow">In progress</p>
+    <h2 style="margin-top:0;" id="scoringHeading">Scoreboard</h2>
+
+    <div class="ledger">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:14%;"></th>
+            <th id="teamAHead">Team A</th>
+            <th id="teamBHead">Team B</th>
+          </tr>
+        </thead>
+        <tbody id="ledgerBody"></tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td>Total</td>
+            <td id="totalA">0</td>
+            <td id="totalB">0</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="score-input-row">
+      <div class="field">
+        <label id="labelA">Team A round score</label>
+        <input type="number" id="roundA" inputmode="numeric" placeholder="0">
+      </div>
+      <div class="field">
+        <label id="labelB">Team B round score</label>
+        <input type="number" id="roundB" inputmode="numeric" placeholder="0">
+      </div>
+    </div>
+    <div class="error" id="roundError"></div>
+    <button class="full" id="addRoundBtn" style="margin-top:14px;">Add round</button>
+  </div>
+
+  <!-- WINNER BANNER -->
+  <div class="banner" id="winnerBanner" style="display:none;">
+    <div class="trophy">🏆</div>
+    <h3 id="winnerText"></h3>
+    <div id="winnerSub" style="font-size:0.85rem; opacity:0.8;"></div>
+    <div class="bottom-nav" style="margin-top:14px;">
+      <button class="btn" id="saveResultBtn">Save to history</button>
+      <a class="btn secondary" href="app.html">Back to games</a>
+    </div>
+    <div class="error" id="saveError"></div>
+  </div>
+
+  <!-- TAWLE PANEL -->
+  <div class="panel" id="tawlePanel" style="display:none;">
+    <p class="eyebrow">Tawle</p>
+    <h2 style="margin-top:0;" id="tawleHeading">Roll the dice</h2>
+
+    <div class="dice-area">
+      <div class="die" id="die1"></div>
+      <div class="die" id="die2"></div>
+    </div>
+    <div class="dice-sum" id="diceSum">—</div>
+    <div class="dice-double" id="diceDouble"></div>
+
+    <button class="full" id="rollBtn" style="margin-top:10px;">🎲 Roll dice</button>
+
+    <div style="margin-top:22px; border-top:1px solid var(--line); padding-top:18px;">
+      <p style="font-size:0.85rem; opacity:0.8; margin:0 0 10px;">
+        When the game is decided, declare the winner:
+      </p>
+      <button class="full" id="declareWinBtn">Declare win for <span id="tawlePlayerName"></span></button>
+    </div>
+  </div>
+
+  <div class="bottom-nav" style="margin-top:10px;">
+    <a class="btn secondary" href="app.html">← Back to games</a>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+const session = requireLogin();
+if (session) renderUserChip(session);
+
+const params = new URLSearchParams(window.location.search);
+const type = params.get("type"); // "400" | "tarneeb" | "likha" | "tawle"
+
+const RULES = {
+  "tarneeb": { label: "Tarneeb", threshold: 31, allowNegative: true },
+  "400":     { label: "400",     threshold: 41, allowNegative: true },
+  "likha":   { label: "Likha",   threshold: 101, allowNegative: false }
+};
+
+let state = {
+  type,
+  players: [],   // [p1, p2, p3, p4]  A: [0,1]  B: [2,3]
+  rounds: [],    // [{a: n, b: n}]
+  totals: { a: 0, b: 0 },
+  finished: false,
+  winningTeam: null,
+  finalScore: null
+};
+
+init();
+
+function init() {
+  if (!type || (!RULES[type] && type !== "tawle")) {
+    document.getElementById("gameTitle").textContent = "Unknown game";
+    document.querySelector(".wrap").innerHTML += '<div class="panel"><p>Unknown game type. <a href="app.html">Go back</a>.</p></div>';
+    return;
+  }
+
+  if (type === "tawle") {
+    document.getElementById("gameTitle").textContent = "Tawle";
+    document.getElementById("tawleSetupPanel").style.display = "";
+    document.getElementById("tawleStartBtn").addEventListener("click", startTawle);
+    return;
+  }
+
+  const r = RULES[type];
+  document.getElementById("gameTitle").textContent = r.label;
+  document.getElementById("setupEyebrow").textContent = r.label + " setup";
+  document.getElementById("scoringEyebrow").textContent =
+    r.label + ` · ends at ${r.threshold}+ · ${r.allowNegative ? "+/− allowed" : "add only"}`;
+  document.getElementById("startBtn").addEventListener("click", startGame);
+  document.getElementById("addRoundBtn").addEventListener("click", addRound);
+  document.getElementById("saveResultBtn").addEventListener("click", saveResult);
+
+  if (!r.allowNegative) {
+    document.getElementById("roundA").min = "0";
+    document.getElementById("roundB").min = "0";
+  }
+}
+
+// ---------- 4-player games ----------
+function startGame() {
+  const errEl = document.getElementById("setupError");
+  errEl.textContent = "";
+  const names = ["p1","p2","p3","p4"].map(id => document.getElementById(id).value.trim());
+  if (names.some(n => !n)) {
+    errEl.textContent = "Enter all 4 player names.";
+    return;
+  }
+  state.players = names;
+
+  document.getElementById("setupPanel").style.display = "none";
+  document.getElementById("scoringPanel").style.display = "";
+
+  document.getElementById("teamAHead").textContent = `${names[0]} & ${names[1]}`;
+  document.getElementById("teamBHead").textContent = `${names[2]} & ${names[3]}`;
+  document.getElementById("labelA").textContent = `${names[0]} & ${names[1]} score`;
+  document.getElementById("labelB").textContent = `${names[2]} & ${names[3]} score`;
+  document.getElementById("scoringHeading").textContent = `${names[0]}/${names[1]} vs ${names[2]}/${names[3]}`;
+
+  renderLedger();
+}
+
+function addRound() {
+  if (state.finished) return;
+  const r = RULES[type];
+  const errEl = document.getElementById("roundError");
+  errEl.textContent = "";
+
+  const aRaw = document.getElementById("roundA").value;
+  const bRaw = document.getElementById("roundB").value;
+  const a = aRaw === "" ? 0 : Number(aRaw);
+  const b = bRaw === "" ? 0 : Number(bRaw);
+
+  if (Number.isNaN(a) || Number.isNaN(b)) {
+    errEl.textContent = "Enter valid numbers.";
+    return;
+  }
+  if (!r.allowNegative && (a < 0 || b < 0)) {
+    errEl.textContent = `${r.label} only allows positive (add) scores.`;
+    return;
+  }
+
+  state.rounds.push({ a, b });
+  state.totals.a += a;
+  state.totals.b += b;
+
+  document.getElementById("roundA").value = "";
+  document.getElementById("roundB").value = "";
+
+  renderLedger();
+  checkGameEnd();
+}
+
+function renderLedger() {
+  const body = document.getElementById("ledgerBody");
+  body.innerHTML = state.rounds.map((rnd, i) => `
+    <tr>
+      <td class="row-num">${i + 1}</td>
+      <td>${rnd.a > 0 ? "+" : ""}${rnd.a}</td>
+      <td>${rnd.b > 0 ? "+" : ""}${rnd.b}</td>
+    </tr>
+  `).join("");
+  document.getElementById("totalA").textContent = state.totals.a;
+  document.getElementById("totalB").textContent = state.totals.b;
+}
+
+function checkGameEnd() {
+  const r = RULES[type];
+  const aWins = state.totals.a >= r.threshold;
+  const bWins = state.totals.b >= r.threshold;
+
+  if (!aWins && !bWins) return;
+
+  let winningTeam, losingScore, winningScore;
+  if (aWins && bWins) {
+    // both crossed in the same round — higher score wins
+    if (state.totals.a === state.totals.b) {
+      // tie at/above threshold: keep playing (rare edge case)
+      return;
+    }
+    winningTeam = state.totals.a > state.totals.b ? 0 : 1;
+  } else {
+    winningTeam = aWins ? 0 : 1;
+  }
+
+  state.finished = true;
+  const names = state.players;
+  const winners = winningTeam === 0 ? [names[0], names[1]] : [names[2], names[3]];
+  const score = winningTeam === 0 ? state.totals.a : state.totals.b;
+  state.winningTeam = winners;
+  state.finalScore = score;
+
+  document.getElementById("addRoundBtn").disabled = true;
+  document.getElementById("roundA").disabled = true;
+  document.getElementById("roundB").disabled = true;
+
+  const r2 = RULES[type];
+  document.getElementById("winnerText").textContent = `${winners.join(" & ")} win!`;
+  document.getElementById("winnerSub").textContent =
+    `Final score ${state.totals.a} – ${state.totals.b} (reached ${r2.threshold}+)`;
+  document.getElementById("winnerBanner").style.display = "";
+}
+
+async function saveResult() {
+  const btn = document.getElementById("saveResultBtn");
+  const errEl = document.getElementById("saveError");
+  errEl.textContent = "";
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+
+  const record = {
+    type,
+    date: new Date().toISOString(),
+    players: state.players,
+    teams: [[state.players[0], state.players[1]], [state.players[2], state.players[3]]],
+    rounds: state.rounds,
+    totals: state.totals,
+    winningTeam: state.winningTeam,
+    finalScore: state.finalScore,
+    recordedBy: session.username
+  };
+
+  try {
+    await appendGameToHistory(record);
+    btn.textContent = "Saved ✓";
+  } catch (e) {
+    errEl.textContent = e.message;
+    btn.disabled = false;
+    btn.textContent = "Save to history";
+  }
+}
+
+// ---------- Tawle ----------
+let tawlePlayerName = "";
+
+function startTawle() {
+  const errEl = document.getElementById("tawleSetupError");
+  const name = document.getElementById("tawlePlayer").value.trim();
+  if (!name) {
+    errEl.textContent = "Enter a player name.";
+    return;
+  }
+  tawlePlayerName = name;
+  document.getElementById("tawleSetupPanel").style.display = "none";
+  document.getElementById("tawlePanel").style.display = "";
+  document.getElementById("tawleHeading").textContent = `${name}'s turn`;
+  document.getElementById("tawlePlayerName").textContent = name;
+  buildDice();
+
+  document.getElementById("rollBtn").addEventListener("click", rollDice);
+  document.getElementById("declareWinBtn").addEventListener("click", declareTawleWin);
+}
+
+const PIP_LAYOUTS = {
+  1: [4],
+  2: [0, 8],
+  3: [0, 4, 8],
+  4: [0, 2, 6, 8],
+  5: [0, 2, 4, 6, 8],
+  6: [0, 2, 3, 5, 6, 8]
+};
+
+function buildDice() {
+  ["die1", "die2"].forEach(id => {
+    const die = document.getElementById(id);
+    die.innerHTML = "";
+    for (let i = 0; i < 9; i++) {
+      const pip = document.createElement("div");
+      pip.className = "pip";
+      die.appendChild(pip);
+    }
+  });
+  setDieValue("die1", 1);
+  setDieValue("die2", 1);
+}
+
+function setDieValue(id, value) {
+  const die = document.getElementById(id);
+  const pips = die.querySelectorAll(".pip");
+  pips.forEach(p => p.classList.remove("on"));
+  PIP_LAYOUTS[value].forEach(idx => pips[idx].classList.add("on"));
+}
+
+function rollDice() {
+  const d1 = document.getElementById("die1");
+  const d2 = document.getElementById("die2");
+  d1.classList.add("rolling");
+  d2.classList.add("rolling");
+
+  const v1 = 1 + Math.floor(Math.random() * 6);
+  const v2 = 1 + Math.floor(Math.random() * 6);
+
+  setTimeout(() => {
+    setDieValue("die1", v1);
+    setDieValue("die2", v2);
+    d1.classList.remove("rolling");
+    d2.classList.remove("rolling");
+
+    document.getElementById("diceSum").textContent = `${v1} + ${v2} = ${v1 + v2}`;
+    document.getElementById("diceDouble").textContent =
+      v1 === v2 ? "Double! Plays as double the value." : "";
+  }, 480);
+}
+
+async function declareTawleWin() {
+  const btn = document.getElementById("declareWinBtn");
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+
+  const record = {
+    type: "tawle",
+    date: new Date().toISOString(),
+    winner: tawlePlayerName,
+    recordedBy: session.username
+  };
+
+  try {
+    await appendGameToHistory(record);
+    document.getElementById("tawleHeading").textContent = `${tawlePlayerName} won! ✓ Saved to history`;
+    btn.textContent = "Saved ✓";
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = `Declare win for ${tawlePlayerName}`;
+    alert("Could not save: " + e.message);
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Card Table — Sign In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap" style="max-width: 420px;">
+  <div class="brand" style="justify-content: center; border-bottom: none; margin-bottom: 36px;">
+    <div style="text-align:center;">
+      <div class="suit" style="display:block; margin-bottom: 6px; font-size:1.4rem; letter-spacing:0.4em;">♠ ♥ ♦ ♣</div>
+      <h1>Card Table</h1>
+    </div>
+  </div>
+
+  <div class="panel">
+    <p class="eyebrow">Sign in</p>
+    <h2 style="margin-top:0;">Welcome back</h2>
+
+    <label for="username">Username</label>
+    <input type="text" id="username" autocomplete="username" placeholder="e.g. elie">
+
+    <label for="password">Password</label>
+    <input type="password" id="password" autocomplete="current-password" placeholder="••••••••">
+
+    <div class="error" id="loginError"></div>
+
+    <button class="full" id="loginBtn" style="margin-top: 18px;">Sign in</button>
+
+    <p class="token-note">
+      Accounts are managed in <code>users.json</code> in this repo. Ask whoever maintains
+      the site to add your username, name, password, phone, and image.
+    </p>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+document.getElementById("loginBtn").addEventListener("click", login);
+document.getElementById("password").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") login();
+});
+
+async function login() {
+  const errEl = document.getElementById("loginError");
+  errEl.textContent = "";
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value;
+
+  if (!username || !password) {
+    errEl.textContent = "Enter both username and password.";
+    return;
+  }
+
+  const btn = document.getElementById("loginBtn");
+  btn.disabled = true;
+  btn.textContent = "Checking…";
+
+  try {
+    // Load users.json — try local relative path first (works on GitHub Pages),
+    // fall back to GitHub Contents API if needed.
+    let users;
+    try {
+      const res = await fetch("users.json", { cache: "no-store" });
+      if (!res.ok) throw new Error("local fetch failed");
+      const data = await res.json();
+      users = data.users;
+    } catch {
+      const { json } = await fetchJsonFile("users.json");
+      users = json.users;
+    }
+
+    const match = (users || []).find(
+      u => u.username.toLowerCase() === username.toLowerCase() && u.password === password
+    );
+
+    if (!match) {
+      errEl.textContent = "Username or password is incorrect.";
+      btn.disabled = false;
+      btn.textContent = "Sign in";
+      return;
+    }
+
+    sessionStorage.setItem("cg_session", JSON.stringify({
+      username: match.username,
+      firstName: match.firstName,
+      lastName: match.lastName,
+      phone: match.phone || "",
+      image: match.image || ""
+    }));
+
+    window.location.href = "app.html";
+  } catch (e) {
+    errEl.textContent = "Could not load user list. " + e.message;
+    btn.disabled = false;
+    btn.textContent = "Sign in";
+  }
+}
+</script>
+</body>
+</html>
