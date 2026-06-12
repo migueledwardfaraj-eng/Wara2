@@ -1,11 +1,11 @@
 {
   "users": [
     {
-      "username": "admin",
-      "firstName": "Admin",
-      "lastName": "User",
-      "password": "1234",
-      "phone": "+961700000000",
+      "username": "Miguel",
+      "firstName": "Miguel",
+      "lastName": "Faraj",
+      "password": "D0022b0c0cf53@$",
+      "phone": "+96170234138",
       "image": "https://api.dicebear.com/7.x/initials/svg?seed=Admin"
     },
     {
