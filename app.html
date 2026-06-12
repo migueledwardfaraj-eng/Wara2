@@ -44,26 +44,12 @@
     <h2 style="margin-top:0;">Game history</h2>
     <div id="historyList"><div class="empty-state">Loading…</div></div>
   </div>
-
-  <div class="panel" id="adminPanel" style="display:none; opacity:0.85;">
-    <p class="eyebrow">Admin</p>
-    <h2 style="margin-top:0;">Data sources</h2>
-    <p style="font-size:0.85rem; opacity:0.8; margin:0;">
-      Users and game history are managed in the linked Google Sheet
-      (tabs: <code>Users</code> and <code>History</code>). Edit rows there
-      directly to add players or fix records.
-    </p>
-  </div>
 </div>
 
 <script src="common.js"></script>
 <script>
 const session = requireLogin();
 if (session) renderUserChip(session);
-
-if (session && session.isAdmin) {
-  document.getElementById("adminPanel").style.display = "";
-}
 
 // Load history
 async function loadHistory() {
@@ -89,12 +75,17 @@ function renderHistItem(g) {
   });
   const typeLabel = { "400": "400", "tarneeb": "Tarneeb", "likha": "Likha", "tawle": "Tawle" }[g.type] || g.type;
 
-  let winnerStr;
+  let winnerStr, loserStr = "";
   if (g.type === "tawle") {
     winnerStr = `🏆 ${g.winner}`;
   } else {
     const winners = g.winningTeam || [];
+    const players = g.players || [];
+    const losers = players.filter(p => !winners.includes(p));
     winnerStr = `🏆 ${winners.join(" & ")} — ${g.finalScore ?? ""}`;
+    if (losers.length) {
+      loserStr = `<div class="hloser">lost: ${losers.join(" & ")}</div>`;
+    }
   }
 
   return `
@@ -103,7 +94,10 @@ function renderHistItem(g) {
         <div class="hgame">${typeLabel}</div>
         <div class="hdate">${dateStr}</div>
       </div>
-      <div class="hwinner">${winnerStr}</div>
+      <div class="hwinner">
+        ${winnerStr}
+        ${loserStr}
+      </div>
     </div>
   `;
 }
