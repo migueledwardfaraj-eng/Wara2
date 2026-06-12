@@ -164,6 +164,7 @@ function init() {
 
   if (type === "tawle") {
     document.getElementById("gameTitle").textContent = "Tawle";
+    document.getElementById("setupPanel").style.display = "none";
     document.getElementById("tawleSetupPanel").style.display = "";
     document.getElementById("tawleStartBtn").addEventListener("click", startTawle);
     return;
