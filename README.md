@@ -1,45 +1,38 @@
 # Card Table
 
 A small GitHub Pages site for tracking 400, Tarneeb, Likha, and Tawle scores
-with a simple login and game history.
+with login and game history — backed by a Google Sheet.
 
 ## Setup
 
-1. **Create a GitHub repo** (e.g. `card-table`) and push all these files to it.
+1. **Google Sheet**: a sheet with two tabs:
+   - `Users`: columns `username | firstName | lastName | password | phone | image | isAdmin`
+   - `History`: columns `type | date | players | teams | rounds | totals | winningTeam | finalScore | recordedBy`
 
-2. **Enable GitHub Pages**: repo Settings → Pages → Source: deploy from
-   branch `main`, root folder. Your site will be at
-   `https://<username>.github.io/<repo>/`.
+2. **Apps Script Web App**: deployed from the sheet (Extensions → Apps Script),
+   handling `?action=getUsers`, `?action=getHistory` (GET) and `addGame` (POST).
+   Deployed with access "Anyone".
 
-3. **Edit `common.js`**: set `GH_OWNER` and `GH_REPO` to your GitHub username
-   and repo name (used to read/write `history.json`).
+3. **`common.js`**: `SHEET_API_URL` is set to your deployed Apps Script `/exec` URL.
 
-4. **Edit `users.json`**: add one entry per person who can log in —
-   `username`, `firstName`, `lastName`, `password`, `phone`, `image` (a URL
-   to an avatar image, or leave it and a placeholder will be generated).
+4. **GitHub Pages**: push all files to a repo, enable Pages (Settings → Pages →
+   deploy from `main`, root).
 
-   ⚠️ **Security note**: if this repo is public, `users.json` (including
-   passwords) is publicly visible to anyone. Use throwaway passwords, or make
-   the repo private (note: private repos require a paid plan for Pages, or
-   you can host elsewhere and keep this as a private data source accessed via
-   a token).
+## Managing users
 
-5. **GitHub token for saving history**: each user who wants to save game
-   results needs a Personal Access Token (fine-grained, scoped to this repo,
-   with "Contents: Read and write" permission). They paste it into the
-   Settings box on the games page — it's stored only in their browser
-   (`localStorage`), never committed.
+Add/edit rows in the `Users` tab of the Sheet — no redeploy needed. Set
+`isAdmin` to `TRUE` for admin accounts (currently shows an extra "Admin" panel
+on the games page pointing back to the Sheet).
 
-   Create one at: GitHub → Settings → Developer settings → Personal access
-   tokens → Fine-grained tokens.
+⚠️ Passwords are stored in plain text in the Sheet — fine for a casual
+private group sharing the Sheet, not for anything sensitive.
 
 ## How it works
 
-- `index.html` — login, checks credentials against `users.json`
-- `app.html` — game picker + history list
-- `game.html?type=tarneeb|400|likha|tawle` — scoring / dice UI
-- `history.json` — appended to via the GitHub Contents API after each game
-- `common.js` — shared session, auth, and GitHub API helpers
+- `index.html` — login, checks credentials via the Apps Script (`getUsers`)
+- `app.html` — game picker + history list (via `getHistory`)
+- `game.html?type=tarneeb|400|likha|tawle` — scoring / dice UI, saves via `addGame`
+- `common.js` — shared session + Sheet API helpers
 - `style.css` — shared styling
 
 ## Game rules implemented
@@ -50,13 +43,3 @@ with a simple login and game history.
 - **Likha**: 4 players (2 teams), ends at 101+, add-only (no negative scores).
 - **Tawle**: single player, dice roller (animated, with double detection),
   winner declared manually and saved to history.
-
-## Notes / next steps
-
-- Currently the GitHub token is a personal token stored per-browser. For a
-  shared multi-user setup, consider a small serverless function (Cloudflare
-  Worker, Vercel function, etc.) that holds a single repo token server-side
-  and exposes a simple "append game" endpoint — then users never need their
-  own token.
-- `users.json` passwords are plain text. Fine for a casual private group,
-  not for anything sensitive.
