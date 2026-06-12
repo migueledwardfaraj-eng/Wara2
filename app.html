@@ -42,7 +42,12 @@
   <div class="panel">
     <p class="eyebrow">Archive</p>
     <h2 style="margin-top:0;">Game history</h2>
-    <div id="historyList"><div class="empty-state">Loading…</div></div>
+    <p style="font-size:0.85rem; opacity:0.75; margin:0 0 14px;">
+      View past games you took part in, filterable by game and opponent.
+    </p>
+    <div class="bottom-nav">
+      <a class="btn full" href="history.html">View game history</a>
+    </div>
   </div>
 </div>
 
@@ -50,62 +55,6 @@
 <script>
 const session = requireLogin();
 if (session) renderUserChip(session);
-
-// Load history
-async function loadHistory() {
-  const listEl = document.getElementById("historyList");
-  try {
-    const allGames = await fetchHistory();
-    const games = allGames.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    if (games.length === 0) {
-      listEl.innerHTML = '<div class="empty-state">No games recorded yet. Play one and it’ll show up here.</div>';
-      return;
-    }
-
-    listEl.innerHTML = games.map(renderHistItem).join("");
-  } catch (e) {
-    listEl.innerHTML = `<div class="empty-state">Could not load history: ${e.message}</div>`;
-  }
-}
-
-function renderHistItem(g) {
-  const dateStr = new Date(g.date).toLocaleString(undefined, {
-    year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
-  });
-  const typeLabel = { "400": "400", "tarneeb": "Tarneeb", "likha": "Likha", "tawle": "Tawle" }[g.type] || g.type;
-
-  let winnerStr, loserStr = "";
-  if (g.type === "tawle") {
-    winnerStr = `🏆 ${g.winner}`;
-    if (g.loser) {
-      loserStr = `<div class="hloser">lost: ${g.loser}</div>`;
-    }
-  } else {
-    const winners = g.winningTeam || [];
-    const players = g.players || [];
-    const losers = players.filter(p => !winners.includes(p));
-    winnerStr = `🏆 ${winners.join(" & ")} — ${g.finalScore ?? ""}`;
-    if (losers.length) {
-      loserStr = `<div class="hloser">lost: ${losers.join(" & ")}</div>`;
-    }
-  }
-
-  return `
-    <div class="hist-item">
-      <div>
-        <div class="hgame">${typeLabel}</div>
-        <div class="hdate">${dateStr}</div>
-      </div>
-      <div class="hwinner">
-        ${winnerStr}
-        ${loserStr}
-      </div>
-    </div>
-  `;
-}
-
-loadHistory();
 </script>
 </body>
 </html>
