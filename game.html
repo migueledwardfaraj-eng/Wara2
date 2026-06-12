@@ -122,13 +122,16 @@ const params = new URLSearchParams(window.location.search);
 const type = params.get("type"); // "400" | "tarneeb" | "likha" | "tawle"
 
 const RULES = {
-  "tarneeb": { label: "Tarneeb", threshold: 31, allowNegative: true, perPlayer: false },
+  "tarneeb": { label: "Tarneeb", threshold: 31, allowNegative: true, perPlayer: false, tarneebBidMode: true },
   "400":     { label: "400",     threshold: 41, allowNegative: true, perPlayer: true, bidMode: true },
   "likha":   { label: "Likha",   threshold: 101, allowNegative: false, perPlayer: true }
 };
 
 // 400 bid -> points table (minimum bid is 2)
 const BID_POINTS = { 2: 2, 3: 3, 4: 4, 5: 10, 6: 12, 7: 14, 8: 16, 9: 27, 10: 30 };
+
+// Tarneeb bid options: 7-12 tricks, or 26 ("bid all 13")
+const TARNEEB_BIDS = [7, 8, 9, 10, 11, 12, 26];
 
 let state = {
   type,
@@ -162,6 +165,8 @@ function init() {
   document.getElementById("setupEyebrow").textContent = r.label + " setup";
   document.getElementById("scoringEyebrow").textContent = r.bidMode
     ? `${r.label} · ends at ${r.threshold}+ · bid 2–10, points per table, fail = negative`
+    : r.tarneebBidMode
+    ? `${r.label} · ends at ${r.threshold}+ · bid 7-12 or 26 (all 13), success = tricks won, fail = lose bid`
     : r.label + ` · ends at ${r.threshold}+ · ${r.allowNegative ? "+/− allowed" : "add only"}`;
   document.getElementById("startBtn").addEventListener("click", startGame);
   document.getElementById("addRoundBtn").addEventListener("click", addRound);
@@ -237,7 +242,42 @@ function buildRoundInputs() {
   const row = document.getElementById("roundInputRow");
   row.innerHTML = "";
 
-  if (r.bidMode) {
+  if (r.tarneebBidMode) {
+    row.classList.remove("cols-4");
+    row.style.gridTemplateColumns = "1fr 1fr 1fr";
+
+    const bidOptions = TARNEEB_BIDS.map(b =>
+      `<option value="${b}">${b === 26 ? "26 (all 13)" : b}</option>`
+    ).join("");
+
+    const teamDiv = document.createElement("div");
+    teamDiv.className = "field";
+    teamDiv.innerHTML = `
+      <label for="bidTeam">Bidding team</label>
+      <select id="bidTeam">
+        <option value="a">${names[0]} & ${names[1]}</option>
+        <option value="b">${names[2]} & ${names[3]}</option>
+      </select>
+    `;
+
+    const bidDiv = document.createElement("div");
+    bidDiv.className = "field";
+    bidDiv.innerHTML = `
+      <label for="tarneebBid">Bid</label>
+      <select id="tarneebBid">${bidOptions}</select>
+    `;
+
+    const tricksDiv = document.createElement("div");
+    tricksDiv.className = "field";
+    tricksDiv.innerHTML = `
+      <label for="tricksWon">Tricks won by bidder</label>
+      <input type="number" id="tricksWon" inputmode="numeric" placeholder="0" min="0" max="13">
+    `;
+
+    row.appendChild(teamDiv);
+    row.appendChild(bidDiv);
+    row.appendChild(tricksDiv);
+  } else if (r.bidMode) {
     row.classList.add("cols-4");
     names.forEach((name, i) => {
       const div = document.createElement("div");
@@ -298,7 +338,38 @@ function addRound() {
   const errEl = document.getElementById("roundError");
   errEl.textContent = "";
 
-  if (r.bidMode) {
+  if (r.tarneebBidMode) {
+    const bidTeam = document.getElementById("bidTeam").value; // "a" or "b"
+    const bid = Number(document.getElementById("tarneebBid").value);
+    const tricksRaw = document.getElementById("tricksWon").value;
+    const tricksWon = tricksRaw === "" ? NaN : Number(tricksRaw);
+
+    if (Number.isNaN(tricksWon) || tricksWon < 0 || tricksWon > 13) {
+      errEl.textContent = "Enter tricks won by the bidding team (0-13).";
+      return;
+    }
+
+    const requiredTricks = bid === 26 ? 13 : bid;
+    const success = tricksWon >= requiredTricks;
+
+    let bidderScore, opponentScore;
+    if (success) {
+      bidderScore = (bid === 26) ? 26 : tricksWon;
+      opponentScore = 0;
+    } else {
+      bidderScore = -bid;
+      opponentScore = 13 - tricksWon;
+    }
+
+    const a = bidTeam === "a" ? bidderScore : opponentScore;
+    const b = bidTeam === "a" ? opponentScore : bidderScore;
+
+    state.rounds.push({ a, b, bidTeam, bid, tricksWon, success });
+    state.totals.a += a;
+    state.totals.b += b;
+
+    document.getElementById("tricksWon").value = "";
+  } else if (r.bidMode) {
     const values = [];
     for (let i = 0; i < 4; i++) {
       const bid = Number(document.getElementById(`bid-p${i}`).value);
@@ -380,13 +451,23 @@ function renderLedger() {
       document.getElementById(`total-p${i}`).textContent = v;
     });
   } else {
-    body.innerHTML = state.rounds.map((rnd, i) => `
-      <tr>
-        <td class="row-num">${i + 1}</td>
-        <td>${rnd.a > 0 ? "+" : ""}${rnd.a}</td>
-        <td>${rnd.b > 0 ? "+" : ""}${rnd.b}</td>
-      </tr>
-    `).join("");
+    body.innerHTML = state.rounds.map((rnd, i) => {
+      let note = "";
+      if (rnd.bidTeam) {
+        const bidLabel = rnd.bid === 26 ? "26 (all 13)" : rnd.bid;
+        const teamName = rnd.bidTeam === "a" ? "Team A" : "Team B";
+        note = `<div style="font-size:0.7rem; opacity:0.6; margin-top:2px;">
+          ${teamName} bid ${bidLabel}, won ${rnd.tricksWon} — ${rnd.success ? "made" : "failed"}
+        </div>`;
+      }
+      return `
+        <tr>
+          <td class="row-num">${i + 1}</td>
+          <td>${rnd.a > 0 ? "+" : ""}${rnd.a}${rnd.bidTeam === "a" ? note : ""}</td>
+          <td>${rnd.b > 0 ? "+" : ""}${rnd.b}${rnd.bidTeam === "b" ? note : ""}</td>
+        </tr>
+      `;
+    }).join("");
     document.getElementById("totalA").textContent = state.totals.a;
     document.getElementById("totalB").textContent = state.totals.b;
   }
