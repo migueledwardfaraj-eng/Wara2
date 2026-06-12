@@ -29,6 +29,7 @@ function renderUserChip(user) {
   el.innerHTML = `
     <img src="${user.image || ('https://api.dicebear.com/7.x/initials/svg?seed=' + encodeURIComponent(user.firstName))}" alt="">
     <span>${user.firstName} ${user.lastName}</span>
+    <a href="profile.html" class="logout-link" id="profileLink">Profile</a>
     <a href="#" class="logout-link" id="logoutLink">Log out</a>
   `;
   document.getElementById("logoutLink").addEventListener("click", (e) => {
@@ -77,6 +78,21 @@ async function appendGameToHistory(gameRecord) {
   });
   if (!res.ok) {
     throw new Error(`Failed to save game: ${res.status}`);
+  }
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
+}
+
+// ---- Update a user's own profile fields ----
+async function updateUser(username, fields) {
+  const res = await fetch(SHEET_API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action: "updateUser", username, fields })
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update profile: ${res.status}`);
   }
   const data = await res.json();
   if (data.error) throw new Error(data.error);
