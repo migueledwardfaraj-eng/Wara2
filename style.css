@@ -140,6 +140,10 @@ input, select {
   outline: none;
   transition: border-color .15s, background .15s;
 }
+input[type="radio"], input[type="checkbox"] {
+  width: auto;
+  padding: 0;
+}
 input:focus, select:focus {
   border-color: var(--gold);
   background: rgba(0,0,0,0.35);
