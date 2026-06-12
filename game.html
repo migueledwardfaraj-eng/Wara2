@@ -39,12 +39,14 @@
     <button class="full" id="startBtn" style="margin-top:18px;">Start game</button>
   </div>
 
-  <!-- SETUP PANEL (Tawle, single player) -->
+  <!-- SETUP PANEL (Tawle, 2 players) -->
   <div class="panel" id="tawleSetupPanel" style="display:none;">
     <p class="eyebrow">Setup</p>
-    <h2 style="margin-top:0;">Who's rolling?</h2>
-    <label for="tawlePlayer">Player name</label>
-    <input type="text" id="tawlePlayer" placeholder="Name">
+    <h2 style="margin-top:0;">Who's playing?</h2>
+    <label for="tawleP1">Player 1</label>
+    <input type="text" id="tawleP1" placeholder="Name">
+    <label for="tawleP2">Player 2</label>
+    <input type="text" id="tawleP2" placeholder="Name">
     <div class="error" id="tawleSetupError"></div>
     <button class="full" id="tawleStartBtn" style="margin-top:18px;">Start</button>
   </div>
@@ -108,7 +110,10 @@
       <p style="font-size:0.85rem; opacity:0.8; margin:0 0 10px;">
         When the game is decided, declare the winner:
       </p>
-      <button class="full" id="declareWinBtn">Declare win for <span id="tawlePlayerName"></span></button>
+      <div class="bottom-nav">
+        <button class="btn" id="declareWinBtn1"></button>
+        <button class="btn" id="declareWinBtn2"></button>
+      </div>
     </div>
   </div>
 
@@ -591,24 +596,27 @@ async function saveResult() {
 }
 
 // ---------- Tawle ----------
-let tawlePlayerName = "";
+let tawlePlayers = ["", ""];
 
 function startTawle() {
   const errEl = document.getElementById("tawleSetupError");
-  const name = document.getElementById("tawlePlayer").value.trim();
-  if (!name) {
-    errEl.textContent = "Enter a player name.";
+  const p1 = document.getElementById("tawleP1").value.trim();
+  const p2 = document.getElementById("tawleP2").value.trim();
+  if (!p1 || !p2) {
+    errEl.textContent = "Enter both player names.";
     return;
   }
-  tawlePlayerName = name;
+  tawlePlayers = [p1, p2];
   document.getElementById("tawleSetupPanel").style.display = "none";
   document.getElementById("tawlePanel").style.display = "";
-  document.getElementById("tawleHeading").textContent = `${name}'s turn`;
-  document.getElementById("tawlePlayerName").textContent = name;
+  document.getElementById("tawleHeading").textContent = `${p1} vs ${p2}`;
   buildDice();
 
   document.getElementById("rollBtn").addEventListener("click", rollDice);
-  document.getElementById("declareWinBtn").addEventListener("click", declareTawleWin);
+  document.getElementById("declareWinBtn1").textContent = `${p1} wins`;
+  document.getElementById("declareWinBtn2").textContent = `${p2} wins`;
+  document.getElementById("declareWinBtn1").addEventListener("click", () => declareTawleWin(p1));
+  document.getElementById("declareWinBtn2").addEventListener("click", () => declareTawleWin(p2));
 }
 
 const PIP_LAYOUTS = {
@@ -662,26 +670,36 @@ function rollDice() {
   }, 480);
 }
 
-async function declareTawleWin() {
-  const btn = document.getElementById("declareWinBtn");
-  btn.disabled = true;
-  btn.textContent = "Saving…";
+async function declareTawleWin(winnerName) {
+  const btn1 = document.getElementById("declareWinBtn1");
+  const btn2 = document.getElementById("declareWinBtn2");
+  btn1.disabled = true;
+  btn2.disabled = true;
+  const clickedBtn = winnerName === tawlePlayers[0] ? btn1 : btn2;
+  const otherBtn = clickedBtn === btn1 ? btn2 : btn1;
+  clickedBtn.textContent = "Saving…";
+
+  const loser = tawlePlayers.find(p => p !== winnerName);
 
   const record = {
     type: "tawle",
     date: new Date().toISOString(),
-    winner: tawlePlayerName,
+    players: tawlePlayers,
+    winner: winnerName,
+    loser: loser,
     recordedBy: session.username
   };
 
   try {
     await appendGameToHistory(record);
-    document.getElementById("tawleHeading").textContent = `${tawlePlayerName} won! ✓ Saved to history`;
-    btn.textContent = "Saved ✓";
+    document.getElementById("tawleHeading").textContent = `${winnerName} won! ✓ Saved to history`;
+    clickedBtn.textContent = "Saved ✓";
+    otherBtn.style.display = "none";
     launchFireworks();
   } catch (e) {
-    btn.disabled = false;
-    btn.textContent = `Declare win for ${tawlePlayerName}`;
+    btn1.disabled = false;
+    btn2.disabled = false;
+    clickedBtn.textContent = winnerName === tawlePlayers[0] ? `${tawlePlayers[0]} wins` : `${tawlePlayers[1]} wins`;
     alert("Could not save: " + e.message);
   }
 }
