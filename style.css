@@ -383,6 +383,11 @@ button.full { width: 100%; }
   text-align: right;
   font-size: 0.85rem;
 }
+.hist-item .hloser {
+  font-size: 0.72rem;
+  opacity: 0.5;
+  margin-top: 2px;
+}
 
 .empty-state {
   text-align: center;
