@@ -61,18 +61,7 @@ async function login() {
   btn.textContent = "Checking…";
 
   try {
-    // Load users.json — try local relative path first (works on GitHub Pages),
-    // fall back to GitHub Contents API if needed.
-    let users;
-    try {
-      const res = await fetch("users.json", { cache: "no-store" });
-      if (!res.ok) throw new Error("local fetch failed");
-      const data = await res.json();
-      users = data.users;
-    } catch {
-      const { json } = await fetchJsonFile("users.json");
-      users = json.users;
-    }
+    const users = await fetchUsers();
 
     const match = (users || []).find(
       u => u.username.toLowerCase() === username.toLowerCase() && u.password === password
@@ -90,7 +79,8 @@ async function login() {
       firstName: match.firstName,
       lastName: match.lastName,
       phone: match.phone || "",
-      image: match.image || ""
+      image: match.image || "",
+      isAdmin: !!match.isAdmin
     }));
 
     window.location.href = "app.html";
