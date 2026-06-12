@@ -34,7 +34,7 @@
       </a>
       <a class="game-card" href="game.html?type=tawle">
         <div class="gname">Tawle</div>
-        <div class="grule">Single player tracking. Dice roller included.</div>
+        <div class="grule">2 players, backgammon-style. Dice roller included; declare the winner when done.</div>
       </a>
     </div>
   </div>
@@ -78,6 +78,9 @@ function renderHistItem(g) {
   let winnerStr, loserStr = "";
   if (g.type === "tawle") {
     winnerStr = `🏆 ${g.winner}`;
+    if (g.loser) {
+      loserStr = `<div class="hloser">lost: ${g.loser}</div>`;
+    }
   } else {
     const winners = g.winningTeam || [];
     const players = g.players || [];
