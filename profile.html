@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Card Table — My Profile</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap" style="max-width: 480px;">
+  <div class="brand">
+    <h1>My Profile</h1>
+    <div class="user-chip" id="userChip"></div>
+  </div>
+
+  <div class="panel">
+    <p class="eyebrow">Account</p>
+    <h2 style="margin-top:0;">Edit your details</h2>
+
+    <label for="username">Username</label>
+    <input type="text" id="username">
+
+    <label for="firstName">First name</label>
+    <input type="text" id="firstName">
+
+    <label for="lastName">Last name</label>
+    <input type="text" id="lastName">
+
+    <label for="phone">Phone number</label>
+    <input type="text" id="phone" placeholder="+961...">
+
+    <label for="image">Profile image URL</label>
+    <input type="text" id="image" placeholder="https://...">
+
+    <label for="password">New password</label>
+    <input type="password" id="password" placeholder="Leave blank to keep current password" autocomplete="new-password">
+
+    <div class="error" id="profileError"></div>
+    <div id="profileSuccess" style="color: var(--gold-soft); font-size:0.85rem; margin-top:10px; min-height:1.2em;"></div>
+
+    <button class="full" id="saveBtn" style="margin-top:18px;">Save changes</button>
+  </div>
+
+  <div class="bottom-nav" style="margin-top:10px;">
+    <a class="btn secondary" href="app.html">← Back to games</a>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+const session = requireLogin();
+if (session) renderUserChip(session);
+
+document.getElementById("username").value = session.username || "";
+document.getElementById("firstName").value = session.firstName || "";
+document.getElementById("lastName").value = session.lastName || "";
+document.getElementById("phone").value = session.phone || "";
+document.getElementById("image").value = session.image || "";
+
+document.getElementById("saveBtn").addEventListener("click", saveProfile);
+
+async function saveProfile() {
+  const errEl = document.getElementById("profileError");
+  const successEl = document.getElementById("profileSuccess");
+  errEl.textContent = "";
+  successEl.textContent = "";
+
+  const newUsername = document.getElementById("username").value.trim();
+  const firstName = document.getElementById("firstName").value.trim();
+  const lastName = document.getElementById("lastName").value.trim();
+  const phone = document.getElementById("phone").value.trim();
+  const image = document.getElementById("image").value.trim();
+  const password = document.getElementById("password").value;
+
+  if (!newUsername || !firstName || !lastName) {
+    errEl.textContent = "Username, first name, and last name are required.";
+    return;
+  }
+
+  const fields = {
+    username: newUsername,
+    firstName,
+    lastName,
+    phone,
+    image
+  };
+  if (password) fields.password = password;
+
+  const btn = document.getElementById("saveBtn");
+  btn.disabled = true;
+  btn.textContent = "Saving…";
+
+  try {
+    await updateUser(session.username, fields);
+
+    // Update session with new values
+    const updatedSession = {
+      ...session,
+      username: newUsername,
+      firstName,
+      lastName,
+      phone,
+      image
+    };
+    sessionStorage.setItem("cg_session", JSON.stringify(updatedSession));
+
+    successEl.textContent = "Saved.";
+    renderUserChip(updatedSession);
+    btn.textContent = "Save changes";
+    btn.disabled = false;
+  } catch (e) {
+    errEl.textContent = e.message;
+    btn.textContent = "Save changes";
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
