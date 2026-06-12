@@ -124,7 +124,7 @@ const type = params.get("type"); // "400" | "tarneeb" | "likha" | "tawle"
 const RULES = {
   "tarneeb": { label: "Tarneeb", threshold: 31, allowNegative: true, perPlayer: false, tarneebBidMode: true },
   "400":     { label: "400",     threshold: 41, allowNegative: true, perPlayer: true, bidMode: true },
-  "likha":   { label: "Likha",   threshold: 101, allowNegative: false, perPlayer: true }
+  "likha":   { label: "Likha",   threshold: 101, allowNegative: false, perPlayer: true, roundSum: 36 }
 };
 
 // 400 bid -> points table (minimum bid is 2)
@@ -167,6 +167,8 @@ function init() {
     ? `${r.label} · ends at ${r.threshold}+ · bid 2–10, points per table, fail = negative`
     : r.tarneebBidMode
     ? `${r.label} · ends at ${r.threshold}+ · bid 7-12 or 26 (all 13), success = tricks won, fail = lose bid`
+    : r.roundSum !== undefined
+    ? `${r.label} · ends at ${r.threshold}+ · add only · round must total ${r.roundSum}`
     : r.label + ` · ends at ${r.threshold}+ · ${r.allowNegative ? "+/− allowed" : "add only"}`;
   document.getElementById("startBtn").addEventListener("click", startGame);
   document.getElementById("addRoundBtn").addEventListener("click", addRound);
@@ -403,6 +405,14 @@ function addRound() {
         return;
       }
       values.push(v);
+    }
+
+    if (r.roundSum !== undefined) {
+      const sum = values.reduce((s, v) => s + v, 0);
+      if (sum !== r.roundSum) {
+        errEl.textContent = `Round total must equal ${r.roundSum} (currently ${sum}).`;
+        return;
+      }
     }
 
     state.rounds.push(values);
