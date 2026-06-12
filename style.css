@@ -270,6 +270,9 @@ button.full { width: 100%; }
   gap: 10px;
   margin-top: 14px;
 }
+.score-input-row.cols-4 {
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+}
 .score-input-row .field label { margin-top: 0; }
 
 .team-label {
@@ -412,4 +415,5 @@ button.full { width: 100%; }
 @media (max-width: 420px) {
   .game-grid { grid-template-columns: 1fr; }
   .die { width: 64px; height: 64px; padding: 8px; }
+  .score-input-row.cols-4 { grid-template-columns: 1fr 1fr; }
 }
