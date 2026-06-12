@@ -70,6 +70,8 @@ a { color: inherit; }
   gap: 10px;
   font-size: 0.85rem;
   color: var(--cream);
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .user-chip img {
@@ -177,7 +179,7 @@ button.secondary {
 }
 button.secondary:hover { border-color: var(--gold); background: rgba(212,175,55,0.08); }
 
-button.full { width: 100%; }
+button.full, a.btn.full { width: 100%; text-align: center; }
 
 .error {
   color: var(--red-chip);
