@@ -44,18 +44,14 @@
     <div id="historyList"><div class="empty-state">Loading…</div></div>
   </div>
 
-  <div class="panel" style="opacity:0.85;">
-    <p class="eyebrow">Settings</p>
-    <h2 style="margin-top:0;">GitHub token</h2>
-    <p style="font-size:0.85rem; opacity:0.8; margin:0 0 10px;">
-      Needed to save finished games back to <code>history.json</code> in the repo.
-      Create a fine-grained personal access token with read/write access to
-      this repo's contents, and paste it below. It is stored only in this
-      browser (localStorage), never committed.
+  <div class="panel" id="adminPanel" style="display:none; opacity:0.85;">
+    <p class="eyebrow">Admin</p>
+    <h2 style="margin-top:0;">Data sources</h2>
+    <p style="font-size:0.85rem; opacity:0.8; margin:0;">
+      Users and game history are managed in the linked Google Sheet
+      (tabs: <code>Users</code> and <code>History</code>). Edit rows there
+      directly to add players or fix records.
     </p>
-    <input type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
-    <button class="secondary" style="margin-top:10px;" id="saveTokenBtn">Save token</button>
-    <span id="tokenStatus" style="margin-left:10px; font-size:0.8rem;"></span>
   </div>
 </div>
 
@@ -64,30 +60,16 @@
 const session = requireLogin();
 if (session) renderUserChip(session);
 
-// Token settings
-const tokenInput = document.getElementById("ghToken");
-tokenInput.value = getToken();
-document.getElementById("saveTokenBtn").addEventListener("click", () => {
-  setToken(tokenInput.value.trim());
-  document.getElementById("tokenStatus").textContent = "Saved.";
-  setTimeout(() => document.getElementById("tokenStatus").textContent = "", 2000);
-});
+if (session && session.isAdmin) {
+  document.getElementById("adminPanel").style.display = "";
+}
 
 // Load history
 async function loadHistory() {
   const listEl = document.getElementById("historyList");
   try {
-    let data;
-    try {
-      const res = await fetch("history.json", { cache: "no-store" });
-      if (!res.ok) throw new Error("local fetch failed");
-      data = await res.json();
-    } catch {
-      const { json } = await fetchJsonFile("history.json");
-      data = json;
-    }
-
-    const games = (data.games || []).slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+    const allGames = await fetchHistory();
+    const games = allGames.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
 
     if (games.length === 0) {
       listEl.innerHTML = '<div class="empty-state">No games recorded yet. Play one and it’ll show up here.</div>';
