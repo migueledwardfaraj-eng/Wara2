@@ -56,33 +56,20 @@
     <div class="ledger">
       <table>
         <thead>
-          <tr>
+          <tr id="ledgerHeadRow">
             <th style="width:14%;"></th>
-            <th id="teamAHead">Team A</th>
-            <th id="teamBHead">Team B</th>
           </tr>
         </thead>
         <tbody id="ledgerBody"></tbody>
         <tfoot>
-          <tr class="total-row">
+          <tr class="total-row" id="ledgerTotalRow">
             <td>Total</td>
-            <td id="totalA">0</td>
-            <td id="totalB">0</td>
           </tr>
         </tfoot>
       </table>
     </div>
 
-    <div class="score-input-row">
-      <div class="field">
-        <label id="labelA">Team A round score</label>
-        <input type="number" id="roundA" inputmode="numeric" placeholder="0">
-      </div>
-      <div class="field">
-        <label id="labelB">Team B round score</label>
-        <input type="number" id="roundB" inputmode="numeric" placeholder="0">
-      </div>
-    </div>
+    <div class="score-input-row" id="roundInputRow"></div>
     <div class="error" id="roundError"></div>
     <button class="full" id="addRoundBtn" style="margin-top:14px;">Add round</button>
   </div>
@@ -135,16 +122,17 @@ const params = new URLSearchParams(window.location.search);
 const type = params.get("type"); // "400" | "tarneeb" | "likha" | "tawle"
 
 const RULES = {
-  "tarneeb": { label: "Tarneeb", threshold: 31, allowNegative: true },
-  "400":     { label: "400",     threshold: 41, allowNegative: true },
-  "likha":   { label: "Likha",   threshold: 101, allowNegative: false }
+  "tarneeb": { label: "Tarneeb", threshold: 31, allowNegative: true, perPlayer: false },
+  "400":     { label: "400",     threshold: 41, allowNegative: true, perPlayer: true },
+  "likha":   { label: "Likha",   threshold: 101, allowNegative: false, perPlayer: true }
 };
 
 let state = {
   type,
   players: [],   // [p1, p2, p3, p4]  A: [0,1]  B: [2,3]
-  rounds: [],    // [{a: n, b: n}]
-  totals: { a: 0, b: 0 },
+  rounds: [],    // Tarneeb: [{a: n, b: n}]   400/Likha: [[n1,n2,n3,n4]]
+  totals: { a: 0, b: 0 },       // Tarneeb
+  playerTotals: [0, 0, 0, 0],   // 400/Likha
   finished: false,
   winningTeam: null,
   finalScore: null
@@ -174,11 +162,6 @@ function init() {
   document.getElementById("startBtn").addEventListener("click", startGame);
   document.getElementById("addRoundBtn").addEventListener("click", addRound);
   document.getElementById("saveResultBtn").addEventListener("click", saveResult);
-
-  if (!r.allowNegative) {
-    document.getElementById("roundA").min = "0";
-    document.getElementById("roundB").min = "0";
-  }
 }
 
 // ---------- 4-player games ----------
@@ -195,13 +178,89 @@ function startGame() {
   document.getElementById("setupPanel").style.display = "none";
   document.getElementById("scoringPanel").style.display = "";
 
-  document.getElementById("teamAHead").textContent = `${names[0]} & ${names[1]}`;
-  document.getElementById("teamBHead").textContent = `${names[2]} & ${names[3]}`;
-  document.getElementById("labelA").textContent = `${names[0]} & ${names[1]} score`;
-  document.getElementById("labelB").textContent = `${names[2]} & ${names[3]} score`;
   document.getElementById("scoringHeading").textContent = `${names[0]}/${names[1]} vs ${names[2]}/${names[3]}`;
 
+  buildLedgerHeader();
+  buildRoundInputs();
   renderLedger();
+}
+
+function buildLedgerHeader() {
+  const r = RULES[type];
+  const names = state.players;
+  const headRow = document.getElementById("ledgerHeadRow");
+  const totalRow = document.getElementById("ledgerTotalRow");
+
+  // clear existing extra cells (keep first th/td)
+  while (headRow.children.length > 1) headRow.removeChild(headRow.lastChild);
+  while (totalRow.children.length > 1) totalRow.removeChild(totalRow.lastChild);
+
+  if (r.perPlayer) {
+    names.forEach((name, i) => {
+      const th = document.createElement("th");
+      th.textContent = name;
+      headRow.appendChild(th);
+
+      const td = document.createElement("td");
+      td.id = `total-p${i}`;
+      td.textContent = "0";
+      totalRow.appendChild(td);
+    });
+  } else {
+    const thA = document.createElement("th");
+    thA.textContent = `${names[0]} & ${names[1]}`;
+    headRow.appendChild(thA);
+
+    const thB = document.createElement("th");
+    thB.textContent = `${names[2]} & ${names[3]}`;
+    headRow.appendChild(thB);
+
+    const tdA = document.createElement("td");
+    tdA.id = "totalA";
+    tdA.textContent = "0";
+    totalRow.appendChild(tdA);
+
+    const tdB = document.createElement("td");
+    tdB.id = "totalB";
+    tdB.textContent = "0";
+    totalRow.appendChild(tdB);
+  }
+}
+
+function buildRoundInputs() {
+  const r = RULES[type];
+  const names = state.players;
+  const row = document.getElementById("roundInputRow");
+  row.innerHTML = "";
+
+  if (r.perPlayer) {
+    row.classList.add("cols-4");
+    names.forEach((name, i) => {
+      const div = document.createElement("div");
+      div.className = "field";
+      div.innerHTML = `
+        <label for="round-p${i}">${name}</label>
+        <input type="number" id="round-p${i}" inputmode="numeric" placeholder="0" ${r.allowNegative ? "" : 'min="0"'}>
+      `;
+      row.appendChild(div);
+    });
+  } else {
+    row.classList.remove("cols-4");
+    const divA = document.createElement("div");
+    divA.className = "field";
+    divA.innerHTML = `
+      <label for="roundA">${names[0]} & ${names[1]} score</label>
+      <input type="number" id="roundA" inputmode="numeric" placeholder="0">
+    `;
+    const divB = document.createElement("div");
+    divB.className = "field";
+    divB.innerHTML = `
+      <label for="roundB">${names[2]} & ${names[3]} score</label>
+      <input type="number" id="roundB" inputmode="numeric" placeholder="0">
+    `;
+    row.appendChild(divA);
+    row.appendChild(divB);
+  }
 }
 
 function addRound() {
@@ -210,79 +269,149 @@ function addRound() {
   const errEl = document.getElementById("roundError");
   errEl.textContent = "";
 
-  const aRaw = document.getElementById("roundA").value;
-  const bRaw = document.getElementById("roundB").value;
-  const a = aRaw === "" ? 0 : Number(aRaw);
-  const b = bRaw === "" ? 0 : Number(bRaw);
+  if (r.perPlayer) {
+    const values = [];
+    for (let i = 0; i < 4; i++) {
+      const raw = document.getElementById(`round-p${i}`).value;
+      const v = raw === "" ? 0 : Number(raw);
+      if (Number.isNaN(v)) {
+        errEl.textContent = "Enter valid numbers.";
+        return;
+      }
+      if (!r.allowNegative && v < 0) {
+        errEl.textContent = `${r.label} only allows positive (add) scores.`;
+        return;
+      }
+      values.push(v);
+    }
 
-  if (Number.isNaN(a) || Number.isNaN(b)) {
-    errEl.textContent = "Enter valid numbers.";
-    return;
+    state.rounds.push(values);
+    values.forEach((v, i) => state.playerTotals[i] += v);
+
+    for (let i = 0; i < 4; i++) document.getElementById(`round-p${i}`).value = "";
+  } else {
+    const aRaw = document.getElementById("roundA").value;
+    const bRaw = document.getElementById("roundB").value;
+    const a = aRaw === "" ? 0 : Number(aRaw);
+    const b = bRaw === "" ? 0 : Number(bRaw);
+
+    if (Number.isNaN(a) || Number.isNaN(b)) {
+      errEl.textContent = "Enter valid numbers.";
+      return;
+    }
+    if (!r.allowNegative && (a < 0 || b < 0)) {
+      errEl.textContent = `${r.label} only allows positive (add) scores.`;
+      return;
+    }
+
+    state.rounds.push({ a, b });
+    state.totals.a += a;
+    state.totals.b += b;
+
+    document.getElementById("roundA").value = "";
+    document.getElementById("roundB").value = "";
   }
-  if (!r.allowNegative && (a < 0 || b < 0)) {
-    errEl.textContent = `${r.label} only allows positive (add) scores.`;
-    return;
-  }
-
-  state.rounds.push({ a, b });
-  state.totals.a += a;
-  state.totals.b += b;
-
-  document.getElementById("roundA").value = "";
-  document.getElementById("roundB").value = "";
 
   renderLedger();
   checkGameEnd();
 }
 
 function renderLedger() {
+  const r = RULES[type];
   const body = document.getElementById("ledgerBody");
-  body.innerHTML = state.rounds.map((rnd, i) => `
-    <tr>
-      <td class="row-num">${i + 1}</td>
-      <td>${rnd.a > 0 ? "+" : ""}${rnd.a}</td>
-      <td>${rnd.b > 0 ? "+" : ""}${rnd.b}</td>
-    </tr>
-  `).join("");
-  document.getElementById("totalA").textContent = state.totals.a;
-  document.getElementById("totalB").textContent = state.totals.b;
+
+  if (r.perPlayer) {
+    body.innerHTML = state.rounds.map((rnd, i) => `
+      <tr>
+        <td class="row-num">${i + 1}</td>
+        ${rnd.map(v => `<td>${v > 0 ? "+" : ""}${v}</td>`).join("")}
+      </tr>
+    `).join("");
+    state.playerTotals.forEach((v, i) => {
+      document.getElementById(`total-p${i}`).textContent = v;
+    });
+  } else {
+    body.innerHTML = state.rounds.map((rnd, i) => `
+      <tr>
+        <td class="row-num">${i + 1}</td>
+        <td>${rnd.a > 0 ? "+" : ""}${rnd.a}</td>
+        <td>${rnd.b > 0 ? "+" : ""}${rnd.b}</td>
+      </tr>
+    `).join("");
+    document.getElementById("totalA").textContent = state.totals.a;
+    document.getElementById("totalB").textContent = state.totals.b;
+  }
 }
 
 function checkGameEnd() {
   const r = RULES[type];
-  const aWins = state.totals.a >= r.threshold;
-  const bWins = state.totals.b >= r.threshold;
-
-  if (!aWins && !bWins) return;
-
-  let winningTeam, losingScore, winningScore;
-  if (aWins && bWins) {
-    // both crossed in the same round — higher score wins
-    if (state.totals.a === state.totals.b) {
-      // tie at/above threshold: keep playing (rare edge case)
-      return;
-    }
-    winningTeam = state.totals.a > state.totals.b ? 0 : 1;
-  } else {
-    winningTeam = aWins ? 0 : 1;
-  }
-
-  state.finished = true;
   const names = state.players;
-  const winners = winningTeam === 0 ? [names[0], names[1]] : [names[2], names[3]];
-  const score = winningTeam === 0 ? state.totals.a : state.totals.b;
-  state.winningTeam = winners;
-  state.finalScore = score;
 
+  if (r.perPlayer) {
+    // Team A = players 0,1 ; Team B = players 2,3
+    // A team wins as soon as EITHER of its players individually reaches the threshold.
+    const teamAReached = state.playerTotals[0] >= r.threshold || state.playerTotals[1] >= r.threshold;
+    const teamBReached = state.playerTotals[2] >= r.threshold || state.playerTotals[3] >= r.threshold;
+
+    if (!teamAReached && !teamBReached) return;
+
+    let winningTeam;
+    if (teamAReached && teamBReached) {
+      // Both teams crossed in the same round — compare each team's best (max) player score
+      const aBest = Math.max(state.playerTotals[0], state.playerTotals[1]);
+      const bBest = Math.max(state.playerTotals[2], state.playerTotals[3]);
+      if (aBest === bBest) return; // tie at/above threshold: keep playing
+      winningTeam = aBest > bBest ? 0 : 1;
+    } else {
+      winningTeam = teamAReached ? 0 : 1;
+    }
+
+    state.finished = true;
+    const winners = winningTeam === 0 ? [names[0], names[1]] : [names[2], names[3]];
+    const winnerIdxs = winningTeam === 0 ? [0, 1] : [2, 3];
+    const finalScore = Math.max(state.playerTotals[winnerIdxs[0]], state.playerTotals[winnerIdxs[1]]);
+    state.winningTeam = winners;
+    state.finalScore = finalScore;
+
+    disableInputs();
+
+    document.getElementById("winnerText").textContent = `${winners.join(" & ")} win!`;
+    document.getElementById("winnerSub").textContent =
+      `${names.map((n, i) => `${n}: ${state.playerTotals[i]}`).join(" · ")} (reached ${r.threshold}+)`;
+    document.getElementById("winnerBanner").style.display = "";
+
+  } else {
+    const aWins = state.totals.a >= r.threshold;
+    const bWins = state.totals.b >= r.threshold;
+
+    if (!aWins && !bWins) return;
+
+    let winningTeam;
+    if (aWins && bWins) {
+      if (state.totals.a === state.totals.b) return; // tie: keep playing
+      winningTeam = state.totals.a > state.totals.b ? 0 : 1;
+    } else {
+      winningTeam = aWins ? 0 : 1;
+    }
+
+    state.finished = true;
+    const winners = winningTeam === 0 ? [names[0], names[1]] : [names[2], names[3]];
+    const score = winningTeam === 0 ? state.totals.a : state.totals.b;
+    state.winningTeam = winners;
+    state.finalScore = score;
+
+    disableInputs();
+
+    document.getElementById("winnerText").textContent = `${winners.join(" & ")} win!`;
+    document.getElementById("winnerSub").textContent =
+      `Final score ${state.totals.a} – ${state.totals.b} (reached ${r.threshold}+)`;
+    document.getElementById("winnerBanner").style.display = "";
+  }
+}
+
+function disableInputs() {
   document.getElementById("addRoundBtn").disabled = true;
-  document.getElementById("roundA").disabled = true;
-  document.getElementById("roundB").disabled = true;
-
-  const r2 = RULES[type];
-  document.getElementById("winnerText").textContent = `${winners.join(" & ")} win!`;
-  document.getElementById("winnerSub").textContent =
-    `Final score ${state.totals.a} – ${state.totals.b} (reached ${r2.threshold}+)`;
-  document.getElementById("winnerBanner").style.display = "";
+  document.querySelectorAll("#roundInputRow input").forEach(el => el.disabled = true);
 }
 
 async function saveResult() {
@@ -292,13 +421,14 @@ async function saveResult() {
   btn.disabled = true;
   btn.textContent = "Saving…";
 
+  const r = RULES[type];
   const record = {
     type,
     date: new Date().toISOString(),
     players: state.players,
     teams: [[state.players[0], state.players[1]], [state.players[2], state.players[3]]],
     rounds: state.rounds,
-    totals: state.totals,
+    totals: r.perPlayer ? state.playerTotals : state.totals,
     winningTeam: state.winningTeam,
     finalScore: state.finalScore,
     recordedBy: session.username
