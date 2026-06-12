@@ -1,9 +1,6 @@
 // ---- Config ----
-// Fill these in once: your GitHub username/org and repo name where
-// users.json and history.json live (this same repo, typically).
-const GH_OWNER = "YOUR_GITHUB_USERNAME";
-const GH_REPO = "YOUR_REPO_NAME";
-const GH_BRANCH = "main";
+// Google Apps Script Web App URL (deployed from the linked Google Sheet).
+const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbyX91Ln_tbXLDP0xLeYVDP3BWTOxiV7LxpoX6J0US8UaEshraWRSUn7TPWtMhAenrGf/exec";
 
 // ---- Session helpers ----
 function getSession() {
@@ -40,66 +37,48 @@ function renderUserChip(user) {
   });
 }
 
-// ---- GitHub token (stored client-side only, for read/write history.json) ----
-function getToken() {
-  return localStorage.getItem("cg_gh_token") || "";
-}
-function setToken(t) {
-  if (t) localStorage.setItem("cg_gh_token", t);
-  else localStorage.removeItem("cg_gh_token");
-}
-
-// ---- Fetch JSON file from repo (works even without token, via raw or contents API) ----
-async function fetchJsonFile(path) {
-  // Try contents API first (works for private repos too, if token present)
-  const token = getToken();
-  const headers = { "Accept": "application/vnd.github+json" };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-
-  const url = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}?ref=${GH_BRANCH}`;
-  const res = await fetch(url, { headers });
-  if (!res.ok) {
-    throw new Error(`Failed to load ${path}: ${res.status}`);
-  }
-  const data = await res.json();
-  const content = decodeURIComponent(escape(atob(data.content)));
-  return { json: JSON.parse(content), sha: data.sha };
+// ---- Fetch users from the Sheet ----
+async function fetchUsers() {
+  const res = await fetch(`${SHEET_API_URL}?action=getUsers`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to load users: ${res.status}`);
+  const users = await res.json();
+  // Normalize isAdmin to boolean (sheet may give TRUE/FALSE/"" /true/false)
+  return users.map(u => ({
+    ...u,
+    isAdmin: u.isAdmin === true || String(u.isAdmin).toUpperCase() === "TRUE"
+  }));
 }
 
-// ---- Write JSON file back to repo (requires token with repo write access) ----
-async function writeJsonFile(path, jsonObj, sha, message) {
-  const token = getToken();
-  if (!token) {
-    throw new Error("No GitHub token set. Add one in Settings to save history.");
-  }
-  const content = btoa(unescape(encodeURIComponent(JSON.stringify(jsonObj, null, 2))));
-  const url = `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/contents/${path}`;
-  const res = await fetch(url, {
-    method: "PUT",
-    headers: {
-      "Accept": "application/vnd.github+json",
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      message: message || `Update ${path}`,
-      content,
-      sha,
-      branch: GH_BRANCH
-    })
+// ---- Fetch game history from the Sheet ----
+async function fetchHistory() {
+  const res = await fetch(`${SHEET_API_URL}?action=getHistory`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to load history: ${res.status}`);
+  const rows = await res.json();
+  // Parse JSON-stringified fields back into objects/arrays
+  return rows.map(row => {
+    const out = { ...row };
+    ["players", "teams", "rounds", "totals", "winningTeam"].forEach(key => {
+      if (typeof out[key] === "string" && out[key].trim().startsWith("[")) {
+        try { out[key] = JSON.parse(out[key]); } catch { /* leave as-is */ }
+      } else if (typeof out[key] === "string" && out[key].trim().startsWith("{")) {
+        try { out[key] = JSON.parse(out[key]); } catch { /* leave as-is */ }
+      }
+    });
+    return out;
+  });
+}
+
+// ---- Append a game to History sheet ----
+async function appendGameToHistory(gameRecord) {
+  const res = await fetch(SHEET_API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" }, // avoids CORS preflight
+    body: JSON.stringify({ action: "addGame", game: gameRecord })
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(`Failed to write ${path}: ${res.status} ${err.message || ""}`);
+    throw new Error(`Failed to save game: ${res.status}`);
   }
-  return res.json();
-}
-
-// ---- Append a game to history.json ----
-async function appendGameToHistory(gameRecord) {
-  const { json, sha } = await fetchJsonFile("history.json");
-  json.games = json.games || [];
-  json.games.push(gameRecord);
-  await writeJsonFile("history.json", json, sha, `Add ${gameRecord.type} game result`);
-  return json;
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data;
 }
