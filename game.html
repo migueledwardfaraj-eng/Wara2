@@ -123,9 +123,12 @@ const type = params.get("type"); // "400" | "tarneeb" | "likha" | "tawle"
 
 const RULES = {
   "tarneeb": { label: "Tarneeb", threshold: 31, allowNegative: true, perPlayer: false },
-  "400":     { label: "400",     threshold: 41, allowNegative: true, perPlayer: true },
+  "400":     { label: "400",     threshold: 41, allowNegative: true, perPlayer: true, bidMode: true },
   "likha":   { label: "Likha",   threshold: 101, allowNegative: false, perPlayer: true }
 };
+
+// 400 bid -> points table (minimum bid is 2)
+const BID_POINTS = { 2: 2, 3: 3, 4: 4, 5: 10, 6: 12, 7: 14, 8: 16, 9: 27, 10: 30 };
 
 let state = {
   type,
@@ -157,8 +160,9 @@ function init() {
   const r = RULES[type];
   document.getElementById("gameTitle").textContent = r.label;
   document.getElementById("setupEyebrow").textContent = r.label + " setup";
-  document.getElementById("scoringEyebrow").textContent =
-    r.label + ` · ends at ${r.threshold}+ · ${r.allowNegative ? "+/− allowed" : "add only"}`;
+  document.getElementById("scoringEyebrow").textContent = r.bidMode
+    ? `${r.label} · ends at ${r.threshold}+ · bid 2–10, points per table, fail = negative`
+    : r.label + ` · ends at ${r.threshold}+ · ${r.allowNegative ? "+/− allowed" : "add only"}`;
   document.getElementById("startBtn").addEventListener("click", startGame);
   document.getElementById("addRoundBtn").addEventListener("click", addRound);
   document.getElementById("saveResultBtn").addEventListener("click", saveResult);
@@ -233,7 +237,32 @@ function buildRoundInputs() {
   const row = document.getElementById("roundInputRow");
   row.innerHTML = "";
 
-  if (r.perPlayer) {
+  if (r.bidMode) {
+    row.classList.add("cols-4");
+    names.forEach((name, i) => {
+      const div = document.createElement("div");
+      div.className = "field";
+      const options = Object.keys(BID_POINTS).map(b =>
+        `<option value="${b}">${b} (${BID_POINTS[b]} pts)</option>`
+      ).join("");
+      div.innerHTML = `
+        <label for="bid-p${i}">${name}</label>
+        <select id="bid-p${i}">
+          <option value="0">No bid</option>
+          ${options}
+        </select>
+        <div style="display:flex; gap:6px; margin-top:6px;">
+          <label style="margin:0; display:flex; align-items:center; gap:4px; font-size:0.78rem;">
+            <input type="radio" name="result-p${i}" value="made" checked style="width:auto;"> Made
+          </label>
+          <label style="margin:0; display:flex; align-items:center; gap:4px; font-size:0.78rem;">
+            <input type="radio" name="result-p${i}" value="failed" style="width:auto;"> Failed
+          </label>
+        </div>
+      `;
+      row.appendChild(div);
+    });
+  } else if (r.perPlayer) {
     row.classList.add("cols-4");
     names.forEach((name, i) => {
       const div = document.createElement("div");
@@ -269,7 +298,27 @@ function addRound() {
   const errEl = document.getElementById("roundError");
   errEl.textContent = "";
 
-  if (r.perPlayer) {
+  if (r.bidMode) {
+    const values = [];
+    for (let i = 0; i < 4; i++) {
+      const bid = Number(document.getElementById(`bid-p${i}`).value);
+      const result = document.querySelector(`input[name="result-p${i}"]:checked`).value;
+      let pts = 0;
+      if (bid > 0) {
+        pts = BID_POINTS[bid];
+        if (result === "failed") pts = -pts;
+      }
+      values.push(pts);
+    }
+
+    state.rounds.push(values);
+    values.forEach((v, i) => state.playerTotals[i] += v);
+
+    for (let i = 0; i < 4; i++) {
+      document.getElementById(`bid-p${i}`).value = "0";
+      document.querySelector(`input[name="result-p${i}"][value="made"]`).checked = true;
+    }
+  } else if (r.perPlayer) {
     const values = [];
     for (let i = 0; i < 4; i++) {
       const raw = document.getElementById(`round-p${i}`).value;
@@ -411,7 +460,7 @@ function checkGameEnd() {
 
 function disableInputs() {
   document.getElementById("addRoundBtn").disabled = true;
-  document.querySelectorAll("#roundInputRow input").forEach(el => el.disabled = true);
+  document.querySelectorAll("#roundInputRow input, #roundInputRow select").forEach(el => el.disabled = true);
 }
 
 async function saveResult() {
